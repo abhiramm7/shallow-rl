@@ -4,39 +4,93 @@ import tensorflow as tf
 class network():
     def __init__(self,
                 input_states,
+                num_layers,
+                nurons_list,
                 output_states,
                 session):
+        
+        # Check if the number of neurons in each layer is 
+        if len(nurons_list) != num_layers:
+            raise ValueError("nurons_list != num of layers")
+        
+        #Initalize the session
+        self.session = session
+        
         # Initialize the network
-        self.state = tf.placeholder(dtype=tf.float64, shape=[None, input_states])
-        # Layer 1
-        self.w1 = tf.Variable(np.random.rand(input_states, 64), dtype=tf.float64)
-        self.b1 = tf.Variable(np.random.rand(64), dtype=tf.float64)
-        self.z1 = tf.tensordot(self.state, self.w1, axes=1) + self.b1
-        self.y1 = tf.nn.relu(self.z1)
-        # Layer 2
-        self.w2 = tf.Variable(np.random.rand(64, 3), dtype=tf.float64)
-        self.b2 = tf.Variable(np.random.rand(3), dtype=tf.float64)
-        self.z2 = tf.tensordot(self.y1, self.w2, axes=1) + self.b2
-        self.y_t = tf.placeholder(dtype=tf.float64, shape=[None, output_states])
+        self.input_states = tf.placeholder(dtype=tf.float64, shape=[None, input_states])
+        self.target_states = tf.placeholder(dtype=tf.float64, shape=[None, output_states])
         
-        self.loss = tf.reduce_mean(tf.square(self.z2 - self.y_t))
-        self.optimizer = tf.train.AdamOptimizer()
-        self.train = self.optimizer.minimize(self.loss)
+        # Create a dictonary of weight and states based on the input layers
+        # Compute the dimentions of the weight bias matrix
+        self.network_depth = num_layers
         
-        self.sess = session;
-        self.sess.run(tf.global_variables_initializer())
+        nurons_list.append(output_states)
+        nurons_list = [input_states] + nurons_list
         
-    def set_weights(self, target):
-        self.sess.run(self.w1.assign(self.sess.run(target.w1)))
-        self.sess.run(self.w2.assign(self.sess.run(target.w2)))
-        self.sess.run(self.b1.assign(self.sess.run(target.b1)))
-        self.sess.run(self.b2.assign(self.sess.run(target.b2)))
+        self.network_width = nurons_list # list of nurons in each layer including input and output 
         
-    def predict_on_batch(self, input_x):
-        return self.sess.run(self.z2, {self.state:input_x})
+        self.weights_bias = {}
+        for i in range(0, self.network_depth+1):
+            self.weights_bias["w"+str(i)] = tf.Variable(np.random.rand(self.network_width[i], self.network_width[i+1]), dtype=tf.float64)
+            self.weights_bias["b"+str(i)] = tf.Variable(np.random.rand(self.network_width[i+1]), dtype=tf.float64)
+        
+        
+        # Set the computation graph for the network
+        self.forward_pass = {}
+        # First layer
+        self.forward_pass["z1"] = tf.tensordot(self.input_states, self.weights_bias["w0"], axes=1) + self.weights_bias["b0"]
+        self.forward_pass["y1"] = tf.nn.relu(self.forward_pass["z1"]) # Make this a user choice 
+        
+        for i in range(2, self.network_depth+1):
+            self.forward_pass["z"+str(i)] = tf.tensordot(self.forward_pass["y"+str(i-1)],
+                                                         self.weights_bias["w"+str(i-1)],
+                                                         axes=1) + self.weights_bias["b"+str(i-1)]
+            self.forward_pass["y"+str(i)] = tf.nn.relu(self.forward_pass["z"+str(i)])
+            
+        # Final Layer with out activation
+        self._predict = tf.tensordot(self.forward_pass["y"+str(self.network_depth)],
+                                    self.weights_bias["w"+str(self.network_depth)],
+                                    axes=1) + self.weights_bias["b"+str(self.network_depth)]
+        
+        # Loss function
+        self.loss = tf.reduce_mean(tf.square(self._predict - self.target_states))
+        
+        # Optimizer 
+        self.optimizer = tf.train.RMSPropOptimizer(0.01)
+        
+        # Training
+        self._train = self.optimizer.minimize(self.loss)
+        
+        # Initialize the variables 
+        self.session.run(tf.global_variables_initializer())
+        
+    def predict_on_batch(self, input_states):
+        return self.session.run(self._predict, {self.input_states:input_states})
     
-    def fit(self, x_train, y_train):
-        self.sess.run(self.train, {self.state:x_train, self.y_t:y_train})
+    def fit(self, inp_states, tar_states):
+        self.session.run(self._train, {self.input_states:inp_states, self.target_states:tar_states})
+        # Return loss function.
+    
+    def save_weights(self, path):
+        data = {}
+        for i in range(0, self.network_depth+1):
+            data["w"+str(i)] = self.session.run(self.weights_bias["w"+str(i)])
+            data["b"+str(i)] = self.session.run(self.weights_bias["b"+str(i)])
+        np.save(path, data)
+        print("Weights Saved to ", path)
+        
+    def get_weights(self):
+        data = {}
+        for i in range(0, self.network_depth+1):
+            data["w"+str(i)] = self.session.run(self.weights_bias["w"+str(i)])
+            data["b"+str(i)] = self.session.run(self.weights_bias["b"+str(i)])
+        return data
+    
+    def set_weights(self, weigths_bias_load):
+        # Make sure the width and depth are equal 
+        for i in range(0, self.network_depth+1):    
+            self.session.run(self.weights_bias["w"+str(i)].assign(weigths_bias_load["w"+str(i)]))
+            self.session.run(self.weights_bias["b"+str(i)].assign(weigths_bias_load["b"+str(i)]))
 
 
 class replay_stacker():
@@ -67,16 +121,11 @@ class replay_memory_agent():
         self.replay_window = replay_window
 
         # Initialize replay memory
-        self.replay_memory = {'states': replay_stacker(self.states_len,
-                                                       self.replay_window),
-                              'states_new': replay_stacker(self.states_len,
-                                                           self.replay_window),
-                              'rewards': replay_stacker(1,
-                                                        self.replay_window),
-                              'actions': replay_stacker(1,
-                                                        self.replay_window),
-                              'terminal': replay_stacker(1,
-                                                         self.replay_window)}
+        self.replay_memory = {'states': replay_stacker(self.states_len, self.replay_window),
+                              'states_new': replay_stacker(self.states_len,self.replay_window),
+                              'rewards': replay_stacker(1,self.replay_window),
+                              'actions': replay_stacker(1,self.replay_window),
+                              'terminal': replay_stacker(1,self.replay_window)}
 
     def replay_memory_update(self,
                              states,
@@ -84,11 +133,13 @@ class replay_memory_agent():
                              rewards,
                              actions,
                              terminal):
+
         self.replay_memory['rewards'].update(rewards)
         self.replay_memory['states'].update(states)
         self.replay_memory['states_new'].update(states_new)
         self.replay_memory['actions'].update(actions)
         self.replay_memory['terminal'].update(terminal)
+
 
 def randombatch(sample_size, replay_size):
     indx = np.linspace(0, replay_size-1, sample_size)
@@ -104,7 +155,6 @@ class deep_q_agent:
                  target_model,
                  states_len,
                  replay_memory,
-                 policy,
                  batch_size=32,
                  target_update=10000,
                  train=True):
@@ -114,7 +164,6 @@ class deep_q_agent:
         self.target_model = target_model
         self.replay = replay_memory
         self.batch_size = batch_size
-        self.policy = policy
         self.train = train
         self.target_update = target_update
 
@@ -124,23 +173,22 @@ class deep_q_agent:
         self.terminal_vector = np.zeros((1))
         self.action_vector = np.zeros((1))
  
-        self.training_batch = {'states': np.zeros((self.batch_size,
-                                                   self.states_len)),
-                               'states_new': np.zeros((self.batch_size,
-                                                       self.states_len)),
+        self.training_batch = {'states': np.zeros((self.batch_size, self.states_len)),
+                               'states_new': np.zeros((self.batch_size, self.states_len)),
                                'actions': np.zeros((self.batch_size, 1)),
                                'rewards': np.zeros((self.batch_size, 1)),
                                'terminal': np.zeros((self.batch_size, 1))}
 
     def _random_sample(self):
-        indx = randombatch(self.batch_size, len(self.replay['states'].data()))
+        temp_l= len(self.replay.replay_memory['states'].data())
+        indx = randombatch(self.batch_size, temp_l)
         for i in self.training_batch.keys():
-            temp = self.replay[i].data()
+            temp = self.replay.replay_memory[i].data()
             self.training_batch[i] = temp[indx]
 
 
     def _update_target_model(self):
-        self.target_model.set_weights(self.ac_model)
+        self.target_model.set_weights(self.ac_model.get_weights())
 
 
     def _train(self):
@@ -149,16 +197,28 @@ class deep_q_agent:
         temp_rewards = self.training_batch['rewards']
         temp_terminal = self.training_batch['terminal']
         temp_actions = self.training_batch['actions']
+
         q_values_train_next = self.target_model.predict_on_batch(temp_states_new)
+
         target = self.ac_model.predict_on_batch(temp_states)
+        
+        s_f = np.zeros((32, 4))
+        t_f = np.zeros((32, 2))
+
         for i in range(self.batch_size):
             action_idx = int(temp_actions[i])
             if temp_terminal[i]:
                 target[i][action_idx] = temp_rewards[i]
             else:
-                target[i][action_idx] = temp_rewards[i] + 0.99 * np.max(q_values_train_next[i])
+                target[i][action_idx] = temp_rewards[i] + 0.99 * np.amax(q_values_train_next[i])
+            
+            temp_s = np.asarray(temp_states[i])
+            s_f[i,:] = temp_s.reshape(1,4)
 
-        self.ac_model.fit(temp_states, target)
+            temp_t = np.asarray(target[i])
+            t_f[i,:] = temp_t.reshape(1,2)
+
+        self.ac_model.fit(s_f, t_f, batch_size=32 ,epochs=1, verbose=0)
 
     def train_q(self, update):
         self._random_sample()
@@ -166,7 +226,7 @@ class deep_q_agent:
             self._update_target_model()
         self._train()
 
-# Policy Function
+# Function
 def epsi_greedy(action_space, q_values, epsilon):
     """Epsilon Greedy"""
     if np.random.rand() < epsilon:

@@ -3,59 +3,55 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 np.random.seed(42)
-
 import gym
-env = gym.make("MountainCar-v0")
-
+# Make the environemnt 
+env = gym.make("CartPole-v0")
+# Tensorflow Session
 sess = tf.Session()
-ac_function = network(2,3, sess)
-target_function = network(2,3, sess)
+# Initalize the neural network
+ac_function = network(4, 2, sess)
+target_function = network(4, 2, sess)
+# Make sure both networks start from the same weight
 target_function.set_weights(ac_function)
-replay = replay_memory_agent(2, 4000)
+# Replay memory
+replay = replay_memory_agent(4, 10000)
+# Deep Q learning agent
 prof_x = deep_q_agent(
     ac_function,
     target_function,
-    3,
+    4,
     replay.replay_memory,
     epsi_greedy)
 state = env.reset()
 # book keeping
 done=False
-reward_track = []
-reward_sum = []
-temp = []
-reward_episode = []
 episodes = 0
-epsilon = 0.10
-for i in range(0, 150000):
+reward_episode = []
+reward_track = []
+epsilon = 1.0
+while episodes < 8000:
     # Pick action
     state = np.asarray(state)
-    state = state.reshape(1,2)
+    state = state.reshape(1, 4)
     q_values = ac_function.predict_on_batch(state)
-    action = epsi_greedy([0, 1, 2], q_values, epsilon)
+    action = epsi_greedy([0, 1], q_values, epsilon)
     # implement action
     state_new, reward, done, _ = env.step(action)
     reward_episode.append(reward)
     # Update the replay memory
     replay.replay_memory_update(state, state_new, reward, action, done)
     # train
-    if i > 1000:
-        update = True if i%4000==0 else False
+    if episodes > 1000:
+        update = True if episodes%500==0 else False
         prof_x.train_q(update)
-        if update:
-            print(np.mean(reward_episode))
-            print(np.sum(reward_sum))
-            temp.append(np.sum(reward_sum)/150000)
     state = state_new
     if done:
+        epsilon = max(0.01, epsilon*0.99) 
         state = env.reset()
-        reward_track.append(np.mean(reward_episode))
+        reward_track.append(np.sum(reward_episode))
         episodes += 1
-        reward_sum.append(np.sum(reward_episode))
         reward_episode = []
-
-plt.figure(1)
 plt.plot(reward_track)
-
-plt.figure(2)
-plt.plot(temp)
+plt.xlabel("Episodes")
+plt.ylabel("Avg Reward")
+plt.show()
