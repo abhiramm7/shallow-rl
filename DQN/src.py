@@ -218,12 +218,12 @@ class deep_q_agent:
             temp_t = np.asarray(target[i])
             t_f[i,:] = temp_t.reshape(1,2)
 
-        self.ac_model.fit(s_f, t_f, batch_size=32 ,epochs=1, verbose=0)
+        self.ac_model.fit(s_f, t_f, verbose=0)
 
     def train_q(self, update):
         self._random_sample()
-        if update:
-            self._update_target_model()
+        #if update:
+        #    self._update_target_model()
         self._train()
 
 # Function

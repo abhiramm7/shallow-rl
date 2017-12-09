@@ -58,9 +58,9 @@ for episodes in range(0, 10000):
     # Clear the reward buffer
     rewards = []
     if gt > 10000:
-        epsilon = max(0.10, epsilon-0.0001)
+        epsilon = max(0.01, epsilon-0.001)
     else:
-        epsilon = 1.0
+        epsilon = 0.2
     
     episode_time = 0
 
@@ -75,7 +75,7 @@ for episodes in range(0, 10000):
         q_values = q_nn.predict_on_batch(state)
 
         if np.random.rand() <= epsilon:
-            action = np.random.choice([0, 1])
+            action = np.random.choice([0, 1, 2, 3, 4, 5])
         else:
             action = np.argmax(q_values)
 

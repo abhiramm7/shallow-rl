@@ -201,7 +201,7 @@ class deep_q_agent:
         temp_terminal = self.training_batch['terminal']
         temp_actions = self.training_batch['actions']
 
-        q_values_train_next = self.target_model.predict_on_batch(temp_states_new)
+        q_values_train_next = self.ac_model.predict_on_batch(temp_states_new)
 
         target = self.ac_model.predict_on_batch(temp_states)
         
@@ -236,8 +236,8 @@ class deep_q_agent:
 
     def train_q(self, update):
         self._random_sample()
-        if update:
-            self._update_target_model()
+        #if update:
+        #    self._update_target_model()
         self._train()
 
 # Function

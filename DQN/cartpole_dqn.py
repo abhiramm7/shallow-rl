@@ -22,12 +22,12 @@ dqn_controller = deep_q_agent(action_value_model=q_nn,
 avg_reward_episodes = []
 
 # Exploration decay
-epsilon = np.linspace(0.10, 0.01, 5001)
+epsilon = np.linspace(0.10, 0.001, 15001)
 
 # Global time step
 gt = 0
 
-for episodes in range(0, 5000):
+for episodes in range(0, 15000):
 
     # Initial State
     state = env.reset()
@@ -58,7 +58,7 @@ for episodes in range(0, 5000):
         replay1.replay_memory_update(state, state_new, reward, action, done)
 
         # Train
-        update = True if gt%1000==0 else False
+        update = True if gt%5000==0 else False
         dqn_controller.train_q(update)
 
         state = state_new
@@ -66,9 +66,8 @@ for episodes in range(0, 5000):
     avg_reward_episodes.append(sum(rewards))
     if episodes%25 == 0:
         print(sum(rewards), "Episode Count :" ,episodes)
-
-q_nn.save_weights("model_1")
-np.save("sum_rewards", avg_reward_episodes)
+        q_nn.save_weights("model_1"+str(episodes))
+        np.save("sum_rewards", avg_reward_episodes)
 
 plt.plot(avg_reward_episodes)
 plt.show()

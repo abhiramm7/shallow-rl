@@ -23,20 +23,21 @@ def build_network(input_states,
     for i_layers in range(0, hidden_layers - 1):
         model.add(Dense(nuron_count))     
         model.add(Activation(activation_function))
+        model.add(BatchNormalization())
         model.add(Dropout(dropout))
     model.add(Dense(output_states))
-    sgd = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+    sgd = Adam(lr=0.003, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
     model.compile(loss='mean_squared_error', optimizer=sgd)
     return model
 
-q_nn = build_network(4, 2, 2, 20, "relu", 0.0);
+q_nn = build_network(4, 2, 2, 20, "relu", 0.2);
 #q_nn.load_weights("model_1")
 target_nn = build_network(4, 2, 2, 20, "relu", 0.0);
 
 
 target_nn.set_weights(q_nn.get_weights())
 
-replay1 = replay_memory_agent(4, 5000)
+replay1 = replay_memory_agent(4, 50000)
 
 dqn_controller = deep_q_agent(action_value_model=q_nn,
                               target_model=target_nn,
@@ -50,7 +51,7 @@ avg_reward_episodes = []
 # Global time step
 gt = 0
 
-for episodes in range(0, 10000):
+for episodes in range(0, 15000):
 
     # Initial State
     state = env.reset()
@@ -59,9 +60,9 @@ for episodes in range(0, 10000):
     # Clear the reward buffer
     rewards = []
     if gt > 10000:
-        epsilon = max(0.01, epsilon-0.0001)
+        epsilon = max(0.01, epsilon-0.0009)
     else:
-        epsilon = 1.0
+        epsilon = 0.4
     
     episode_time = 0
 
@@ -90,15 +91,13 @@ for episodes in range(0, 10000):
 
         if gt > 10000:
             # Train
-            update = True if gt%5000==0 else False
+            update = True if gt%10000==0 else False
             dqn_controller.train_q(update)
-            if update:
-                print("updated ", gt)
 
         state = state_new
 
         episode_time += 1
-        if episode_time > 200:
+        if episode_time >= 200:
             break
 
     avg_reward_episodes.append(sum(rewards))
