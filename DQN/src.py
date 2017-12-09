@@ -222,8 +222,8 @@ class deep_q_agent:
 
     def train_q(self, update):
         self._random_sample()
-        #if update:
-        #    self._update_target_model()
+        if update:
+            self._update_target_model()
         self._train()
 
 # Function

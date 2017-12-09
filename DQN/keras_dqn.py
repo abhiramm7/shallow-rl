@@ -30,7 +30,7 @@ def build_network(input_states,
     model.compile(loss='mean_squared_error', optimizer=sgd)
     return model
 
-q_nn = build_network(4, 2, 2, 20, "relu", 0.2);
+q_nn = build_network(4, 2, 2, 20, "relu", 0.0);
 #q_nn.load_weights("model_1")
 target_nn = build_network(4, 2, 2, 20, "relu", 0.0);
 
@@ -93,6 +93,7 @@ for episodes in range(0, 15000):
             # Train
             update = True if gt%10000==0 else False
             dqn_controller.train_q(update)
+            print("Updated :",gt)
 
         state = state_new
 
