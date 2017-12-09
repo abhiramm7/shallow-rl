@@ -30,9 +30,9 @@ def build_network(input_states,
     model.compile(loss='mean_squared_error', optimizer=sgd)
     return model
 
-q_nn = build_network(4, 2, 2, 20, "relu", 0.0);
+q_nn = build_network(4, 2, 3, 32, "relu", 0.0);
 #q_nn.load_weights("model_1")
-target_nn = build_network(4, 2, 2, 20, "relu", 0.0);
+target_nn = build_network(4, 2, 3, 32, "relu", 0.0);
 
 
 target_nn.set_weights(q_nn.get_weights())
@@ -89,11 +89,11 @@ for episodes in range(0, 15000):
         # Update the replay memory
         replay1.replay_memory_update(state, state_new, reward, action, done)
 
-        if gt > 10000:
-            # Train
+        if gt > 5000:
             update = True if gt%10000==0 else False
             dqn_controller.train_q(update)
-            print("Updated :",gt)
+            if update:
+                print("Updated :",gt)
 
         state = state_new
 
