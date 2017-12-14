@@ -53,10 +53,11 @@ class network():
                                     axes=1) + self.weights_bias["b"+str(self.network_depth)]
         
         # Loss function
-        self.loss = tf.reduce_mean(tf.square(self._predict - self.target_states))
+        # Hubers labels and predictions
+        self.loss = tf.losses.huber_loss(self.target_states, self._predict)
         
         # Optimizer 
-        self.optimizer = tf.train.RMSPropOptimizer(0.01)
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=0.003)
         
         # Training
         self._train = self.optimizer.minimize(self.loss)
@@ -155,9 +156,10 @@ class deep_q_agent:
                  target_model,
                  states_len,
                  replay_memory,
+                 call,
                  batch_size=32,
                  target_update=10000,
-                 train=True):
+                 train=True,):
 
         self.states_len = states_len
         self.ac_model = action_value_model
@@ -166,6 +168,7 @@ class deep_q_agent:
         self.batch_size = batch_size
         self.train = train
         self.target_update = target_update
+        self.call = call 
 
         self.state_vector = np.zeros((1, self.states_len))
         self.state_new_vector = np.zeros((1, self.states_len))
@@ -198,7 +201,7 @@ class deep_q_agent:
         temp_terminal = self.training_batch['terminal']
         temp_actions = self.training_batch['actions']
 
-        q_values_train_next = self.target_model.predict_on_batch(temp_states_new)
+        q_values_train_next = self.ac_model.predict_on_batch(temp_states_new)
 
         target = self.ac_model.predict_on_batch(temp_states)
         
@@ -218,7 +221,7 @@ class deep_q_agent:
             temp_t = np.asarray(target[i])
             t_f[i,:] = temp_t.reshape(1,2)
 
-        self.ac_model.fit(s_f, t_f, verbose=0)
+        self.ac_model.fit(s_f, t_f, verbose=0, callbacks=self.call)
 
     def train_q(self, update):
         self._random_sample()

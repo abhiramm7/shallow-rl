@@ -23,23 +23,24 @@ def build_network(input_states,
     for i_layers in range(0, hidden_layers - 1):
         model.add(Dense(nuron_count))     
         model.add(Activation(activation_function))
+        model.add(BatchNormalization())
         model.add(Dropout(dropout))
     model.add(Dense(output_states))
-    sgd = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+    sgd = Adam(lr=0.003, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
     model.compile(loss='mean_squared_error', optimizer=sgd)
     return model
 
 
 
-q_nn = build_network(4, 2, 2, 20, "relu", 0.0);
-env = gym.make("CartPole-v1")
+q_nn = build_network(4, 2, 3, 20, "relu", 0.0);
+env = gym.make("CartPole-v0")
 
 # Book keeping
 model_reward = []
 # Global time step
 gt = 0
 
-for weights in np.linspace(0, 8500, 86, dtype=int):
+for weights in np.linspace(0, 1200, 13, dtype=int):
 
     q_nn.load_weights("model"+str(weights))
 

@@ -6,6 +6,14 @@ from keras.optimizers import Adam
 import matplotlib.pyplot as plt
 import numpy as np
 import gym
+from keras.callbacks import Callback
+
+class LossHistory(Callback):
+    def on_train_begin(self, logs={}):
+        self.losses = []
+
+    def on_batch_end(self, batch, logs={}):
+        self.losses.append(logs.get('loss'))
 
 def build_network(input_states,
                   output_states,
@@ -26,32 +34,35 @@ def build_network(input_states,
         model.add(BatchNormalization())
         model.add(Dropout(dropout))
     model.add(Dense(output_states))
-    sgd = Adam(lr=0.003, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+    sgd = Adam(lr=0.03, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
     model.compile(loss='mean_squared_error', optimizer=sgd)
     return model
 
-q_nn = build_network(4, 2, 3, 32, "relu", 0.0);
+q_nn = build_network(4, 2, 5, 20, "relu", 0.0);
 #q_nn.load_weights("model_1")
-target_nn = build_network(4, 2, 3, 32, "relu", 0.0);
+target_nn = build_network(4, 2, 5, 20, "relu", 0.0);
 
 
 target_nn.set_weights(q_nn.get_weights())
 
 replay1 = replay_memory_agent(4, 50000)
 
+his = LossHistory()
+
 dqn_controller = deep_q_agent(action_value_model=q_nn,
                               target_model=target_nn,
                               states_len=4,
-                              replay_memory=replay1)
+                              replay_memory=replay1,
+                              call = [his])
 
-env = gym.make("CartPole-v1")
+env = gym.make("CartPole-v0")
 
 # Book keeping
 avg_reward_episodes = []
 # Global time step
 gt = 0
 
-for episodes in range(0, 15000):
+for episodes in range(0, 5000):
 
     # Initial State
     state = env.reset()
@@ -59,10 +70,10 @@ for episodes in range(0, 15000):
     
     # Clear the reward buffer
     rewards = []
-    if gt > 10000:
+    if gt > 1000:
         epsilon = max(0.01, epsilon-0.0009)
     else:
-        epsilon = 0.4
+        epsilon = 1.0
     
     episode_time = 0
 
@@ -89,9 +100,9 @@ for episodes in range(0, 15000):
         # Update the replay memory
         replay1.replay_memory_update(state, state_new, reward, action, done)
 
-        if gt > 5000:
-            update = True if gt%10000==0 else False
-            dqn_controller.train_q(update)
+        if gt > 1000:
+            update = True if gt%500==0 else False
+            dqn_controller.train_q(False)
             if update:
                 print("Updated :",gt)
 

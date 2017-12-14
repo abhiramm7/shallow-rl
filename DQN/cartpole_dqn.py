@@ -4,14 +4,14 @@ import tensorflow as tf
 import gym
 import matplotlib.pyplot as plt
 
-np.random.seed(42)
 env = gym.make("CartPole-v0")
 
-q_nn = network(input_states=4, num_layers=1, nurons_list=[10], output_states=2, session=tf.Session())
-target_nn = network(input_states=4, num_layers=1, nurons_list=[10], output_states=2, session=q_nn.session)
+
+q_nn = network(input_states=4, num_layers=2, nurons_list=[10, 10], output_states=2, session=tf.Session())
+target_nn = network(input_states=4, num_layers=2, nurons_list=[10, 10], output_states=2, session=q_nn.session)
 target_nn.set_weights(q_nn.get_weights())
 
-replay1 = replay_memory_agent(4, 10000)
+replay1 = replay_memory_agent(4, 5000)
 dqn_controller = deep_q_agent(action_value_model=q_nn,
                               target_model=target_nn,
                               states_len=4,
@@ -20,14 +20,13 @@ dqn_controller = deep_q_agent(action_value_model=q_nn,
 
 # Book keeping
 avg_reward_episodes = []
-
 # Exploration decay
-epsilon = np.linspace(0.10, 0.001, 15001)
+epsilon = np.linspace(0.20, 0.001, 16001)
 
 # Global time step
 gt = 0
 
-for episodes in range(0, 15000):
+for episodes in range(0, 15500):
 
     # Initial State
     state = env.reset()
@@ -45,7 +44,7 @@ for episodes in range(0, 15000):
 
         # Pick a action based on the state
         q_values = q_nn.predict_on_batch(state)
-        action = epsi_greedy([0, 1], q_values, 0.10)#epsilon[episodes])
+        action = epsi_greedy([0, 1], q_values, epsilon[episodes])
 
         # Implement action and observe the reward signal
         state_new, reward, done, _ = env.step(action)
@@ -58,13 +57,13 @@ for episodes in range(0, 15000):
         replay1.replay_memory_update(state, state_new, reward, action, done)
 
         # Train
-        update = True if gt%5000==0 else False
+        update = True if gt%1000==0 else False
         dqn_controller.train_q(update)
 
         state = state_new
 
     avg_reward_episodes.append(sum(rewards))
-    if episodes%25 == 0:
+    if episodes%150 == 0:
         print(sum(rewards), "Episode Count :" ,episodes)
         q_nn.save_weights("model_1"+str(episodes))
         np.save("sum_rewards", avg_reward_episodes)
